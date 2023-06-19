@@ -1,0 +1,271 @@
+- hosts: ubuntulocal
+  gather_facts: false
+  vars:
+    nginx_port: 8080
+    ansible_become_pass: ubuntu2023
+    container_name: ubuntuansible
+  tasks:
+    - name: Esempio di task
+      command: echo "Hello!"
+    #   # Non è necessario cambiare utente in questo caso
+      become: true
+      become_user: root
+      become_method: sudo
+      delegate_to: localhost
+
+    - name: system packages present
+      ansible.builtin.apt:
+        name:
+          - python3-pip
+          - python3-setuptools
+        state: latest
+      delegate_to: localhost
+
+    - name: Docker Module for Python
+      ansible.builtin.pip:
+        name: docker
+      delegate_to: localhost
+
+    - name: pull image
+      community.docker.docker_image:
+        name: ubuntu
+        source: pull
+        tag: 22.04       
+      delegate_to: localhost
+
+    - name: run ubuntu container
+      community.docker.docker_container:
+        name: ubuntuansible
+        image: ubuntu
+        state: started
+        detach: true
+        interactive: true
+        exposed_ports:
+          - 22
+        ports:
+          - "2222:22"
+        command: ["/bin/bash" , "-D"]
+      delegate_to: localhost
+
+
+
+
+- hosts: ubuntucontainer
+  gather_facts: false
+  vars:
+    nginx_port: 8080
+  tasks:
+    - name: Execute command without Python
+      raw: apt-get update
+
+    - name: Execute command without Python
+      raw: apt-get install -y python3
+        
+
+
+    - name: Aggiornare la cache dei pacchetti
+      apt:
+        update_cache: true
+        upgrade: dist
+        force_apt_get: true
+
+      
+    - name: system packages present
+      ansible.builtin.apt:
+        name:
+        #apt getupdate e install .python
+          - sudo
+          - python3
+          - python3-apt
+          - python3-pip
+          - python3-setuptools
+          - python3-cryptography
+          - python3-openssl
+          - curl
+        state: latest
+
+    - name: Create /var/run/sshd directory
+      file:
+        path: /var/run/sshd
+        state: directory
+      become: true
+
+    - name: Install openssh-server package
+      apt:
+        name: openssh-server
+        state: present
+      become: true
+
+# But using command module, and passing 'sudo service ssh stop'
+
+
+    - name: start SSH service
+      become: true
+      command: sudo service ssh start
+
+
+    - name: Create a non-root user
+      user:
+        name: ubuntu
+        shell: /bin/bash
+        create_home: yes
+      become: true
+
+    - name: Set password for ubuntu user
+      user:
+        name: ubuntu
+        password: "{{ 'ubuntu2023' | password_hash('sha512', 'mysecretsalt') }}"
+      become: true       
+
+    #   #al contrario della wsl dove i built in per recuperare info sull' O.S sono funzionanti, 
+    #   sui container ho capito che non è possibile
+   
+    - name: Execute command to get Ubuntu version
+      command: lsb_release -rs
+      register: ubuntu_version
+      changed_when: false
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+      become: true
+
+    - name: Create a directory if it does not exist - NGINX
+      ansible.builtin.file:
+        path: /etc/nginx
+        state: directory
+        mode: '0755'
+      become: true
+      
+    - name: Copy Nginx configuration file
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+
+    - name: Create a directory if it does not exist - HTML
+      ansible.builtin.file:
+        path: /usr/share/nginx/html
+        state: directory
+        mode: '0755'
+      become: true      
+
+    - name: Copy HTML Nginx configuration file
+      template:
+        src: nginx.confhtmlnew.j2
+        dest:  /usr/share/nginx/html/index.html
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+
+    - name: start NGINX service
+      become: true
+      command: sudo service nginx start
+
+    - name: Check that a page returns successfully
+      ansible.builtin.uri:
+        url: 'http://localhost:{{ nginx_port}}'
+        return_content: true
+      register: response
+      become: true
+      delegate_to: localhost
+
+    - name: Display get output
+      debug:
+        var: response.content
+    - name: Create your local file on master node
+      ansible.builtin.file:
+        path: /root
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      become: true  
+
+    - name: Print output to file
+      ansible.builtin.copy:
+        content: "{{response.content}}"
+        dest: /root/report.txt
+      become: true
+      delegate_to: localhost
+    
+    - name: Create SSH directory
+      ansible.builtin.file:
+        path: ~/.ssh
+        state: directory
+        mode: '0700'
+        owner: ubuntu
+
+- hosts: ubuntulocal
+  gather_facts: false
+  vars:
+    ansible_ssh_user: ubuntu
+    ansible_ssh_pass: ubuntu2023
+    ansible_pass: ubuntu2023
+    ansible_user: ubuntu
+    ansible_become_pass: ubuntu2023
+  tasks:
+
+    # - name: Generate SSH key pair
+    #   ansible.builtin.openssl_privatekey:
+    #     path: ~/.ssh/id_rsa
+    #     size: 2048
+    #     type: RSA
+    #   register: private_key
+
+    # - name: Copy SSH public key to authorized_keys
+    #   ansible.builtin.copy:
+    #     content: "{{ private_key}}"
+    #     dest: ~/.ssh/authorized_keys
+    #     mode: '0600'
+    #     owner: ubuntu
+
+    # - name: Copy ssh private key
+    #   command: ssh-copy-id -o -i /root/.ssh/id_rsa ubuntu@172.17.0.2
+    #   become: true
+    #   become_user: ubuntu    
+ 
+  - name: Create SSH directory
+    ansible.builtin.file:
+      path: ~/.ssh
+      state: directory
+      mode: '0700'
+      owner: ubuntu
+
+  - name: keygen reset known_hosts
+    become: true
+    command: ssh-keygen -f "/root/.ssh/known_hosts" -R "172.17.0.2"   
+
+  - name: ssh creazione chiavi
+    become: true
+    command: ssh-keygen -f id_rsa -t rsa -y
+
+  - name: ssh copia chiavi
+    become: true
+    command: ssh-copy-id -i ~/.ssh/id_rsa.pub ubuntu@172.17.0.2  
+
+  - name: Test SSH connection
+    ansible.builtin.ping:
+
+  - name: Restart SSH service
+    ansible.builtin.service:
+      name: ssh
+      state: restarted
+
+  - name: Connect SSH
+    ansible.builtin.command: ssh ubuntu@172.17.0.2
+
+- hosts: ubuntucontainer
+  gather_facts: false
+  tasks:
+
+    - name: Turn off password authentication
+      template: src=disablePasswordAuth.conf dest=/etc/ssh/sshd_config.d/disablePasswordAuth.conf
+
+    - name: restart SSH service
+      command: service ssh restart

@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    </head>
+    <body>
+        
+        <h1> Ciao da 
+            {{ hostvars[inventory_hostname].ansible_distribution }}
+            {{ hostvars[inventory_hostname].ansible_distribution_major_version }}
+            {{ hostvars[inventory_hostname].ansible_distribution_version }}
+        </h1>
+    </body>
+</html>  

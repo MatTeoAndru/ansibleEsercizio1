@@ -1,0 +1,38 @@
+# For more information on configuration, see:
+#   * Official English Documentation: http://nginx.org/en/docs/
+# https://kapitan.dev/pages/input_types/jinja/#documentation
+# https://gist.github.com/bcrisp4/679c24e3cfd46243424302eff7f895a5
+# https://github.com/blacksaildivision/ansible-tutorial/blob/master/example/roles/nginx/templates/nginx.conf.j2
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+    server {
+        listen       {{ nginx_port }} default_server;
+        listen       [::]:{{ nginx_port }} default_server;
+        server_name  _;
+        root         /usr/share/nginx/html;
+
+
+        # Load configuration files for the default server block.
+        include /etc/nginx/default.d/*.conf;
+
+        location / {
+        }
+
+        error_page 404 /404.html;
+            location = /40x.html {
+        }
+
+        error_page 500 502 503 504 /50x.html;
+            location = /50x.html {
+        }
+    }
+}

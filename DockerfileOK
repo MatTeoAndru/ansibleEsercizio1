@@ -1,0 +1,44 @@
+FROM ubuntu:22.04
+
+# Install SSH server
+RUN apt-get update && apt-get install -y openssh-server && apt install sudo -y &&  apt install nano -y
+
+
+RUN mkdir /var/run/sshd
+
+# Create a non-root user
+RUN useradd -m -s /bin/bash ubuntu
+
+# Set password for the user
+RUN echo 'ubuntu:ubuntu2023!' | chpasswd
+
+# Allow SSH login as root
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+
+#nano sudoers
+#ubuntu ALL=(ALL) NOPASSWD: ALL
+RUN echo "ubuntu ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers
+# Expose port 22
+EXPOSE 22
+
+# Start SSH server
+CMD ["/usr/sbin/sshd", "-D"]
+
+#aggiungere sudo + sudo apt install -y python3-pip +  sudo apt install -y build-essential libssl-dev libffi-dev python3-dev + 
+#sudo apt-get update + sudo apt-get install python3-apt + nano + ufw + nginx + sudo ufw allow 'Nginx HTTP' + update-alternatives --set iptables /usr/sbin/iptables-legacy
+
+# apt-get install xtables-addons-common
+
+# apt-get install xtables-addons-source
+
+# m-a prepare
+
+# m-a build xtables-addons
+
+# m-a install xtables-addons
+
+#sudo apt-get install -y python-jinja2
+
+
+#nano ~/.ssh/known_hosts
